@@ -451,9 +451,9 @@ angular.module('teamform-team-app', ['firebase'])
 				break;
 			}
 		}
-		if(memberInfo === undefined 
-			|| memberInfo.inTeam !== undefined
-			|| memberInfo.invitedBy.indexOf($scope.param.teamName) != -1) return false;
+		if(typeof memberInfo === "undefined"
+			|| typeof memberInfo.inTeam !== "undefined"
+			|| (typeof memberInfo.invitedBy !== "undefined" && memberInfo.invitedBy.indexOf($scope.param.teamName) !== -1)) return false;
 		return true;
 	};
 	
