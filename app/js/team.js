@@ -71,7 +71,7 @@ angular.module('teamform-team-app', ['firebase'])
 			$('#team_page_controller').show(); // show UI
 		} 
 	});
-	
+		
 	refPath = $scope.eventName + "/member";
 	$scope.member = [];
 	$scope.member = $firebaseArray(firebase.database().ref(refPath));
@@ -93,25 +93,56 @@ angular.module('teamform-team-app', ['firebase'])
 	$scope.retrieveNameFromID = function(id) {
 		return getUserName(id, $scope.users);
 	};
-
+	$scope.abilityList =["Java","C++","Python","HTML","Chinese"];
 	$scope.retrieveTagsFromID = function(id) {
-		for(var tmpIdx = 0; tmpIdx < $scope.member.length; tmpIdx++) {
-			if($scope.member[tmpIdx].$id === id) {
-				if(angular.isDefined($scope.member[tmpIdx].tags) === false) {return "none"};
-				return $scope.member[tmpIdx].tags ;
+		var tags = [];
+		for(var tmpIdx = 0; tmpIdx < $scope.users.length; tmpIdx++) {
+			if($scope.users[tmpIdx].$id === id) {
+				if(typeof $scope.users[tmpIdx].ability == "undefined") return null;
+				if(typeof $scope.users[tmpIdx].ability.java != "undefined") {tags.push("Java");}
+				if(typeof $scope.users[tmpIdx].ability.cpp != "undefined") {tags.push("C++");}
+				if(typeof $scope.users[tmpIdx].ability.python != "undefined") {tags.push("Python");}
+				if(typeof $scope.users[tmpIdx].ability.html != "undefined") {tags.push("HTML");}
+				if(typeof $scope.users[tmpIdx].ability.chinese != "undefined") {tags.push('Chinese');}
+				return tags;
 			}
 		}
-		return "none";
+		return null;
 	};
 	
-	$scope.retrieveScoreFromTags = function(mtags) {
-		if(mtags === "null") {return 0 ;}
+	$scope.retrieveMarksFromID = function(id,subj) {
+		var marks =0;
+		if	(
+				subj != "Java" 
+			&&	subj != "C++" 
+			&&	subj != "Python" 
+			&&	subj != "HTML"
+			&&	subj != "Chinese"
+			) return 100;
+		for(var tmpIdx = 0; tmpIdx < $scope.users.length; tmpIdx++) {
+			if($scope.users[tmpIdx].$id === id) {
+				if(typeof $scope.users[tmpIdx].ability == "undefined") return 0;		
+				if(subj == "Java" && typeof $scope.users[tmpIdx].ability.java != "undefined") {marks =$scope.users[tmpIdx].ability.java.marks;}
+				if(subj == "C++" && typeof $scope.users[tmpIdx].ability.cpp != "undefined") {marks =$scope.users[tmpIdx].ability.cpp.marks;}
+				if(subj == "Python" && typeof $scope.users[tmpIdx].ability.python != "undefined") {marks =$scope.users[tmpIdx].ability.python.marks;}
+				if(subj == "HTML" && typeof $scope.users[tmpIdx].ability.html != "undefined") {marks =$scope.users[tmpIdx].ability.html.marks;}
+				if(subj == "Chinese" && typeof $scope.users[tmpIdx].ability.chinese != "undefined") {marks =$scope.users[tmpIdx].ability.chinese.marks;}
+				break;
+			}
+		}	
+		
+		return marks;
+	};
+	
+	$scope.retrieveScoreFromTags = function(id,mtags) {
+		
+		if(mtags === null) {return 0 ;}
 		var score =0;
 		var found = -1;
 		for(var i =0; i < mtags.length; i++) {
 			found = $scope.param.tags.indexOf(mtags[i]);
 			if(found  !== -1) {
-				score += $scope.param.weight[found];
+				score += $scope.param.weight[found] * $scope.retrieveMarksFromID(id,mtags[i])/100;
 			}
 		}
 		return score;
@@ -131,7 +162,7 @@ angular.module('teamform-team-app', ['firebase'])
 			 }
 		 	scores.push(item);
 			scores[i].sid = req[i];
-			scores[i].score = $scope.retrieveScoreFromTags($scope.retrieveTagsFromID(req[i]));
+			scores[i].score = $scope.retrieveScoreFromTags(req[i],$scope.retrieveTagsFromID(req[i]));
 		 }
 		 for(var i =0; i < scores.length; i) {
 			  var maxid = $scope.returnMaxidx(scores);
@@ -198,7 +229,7 @@ angular.module('teamform-team-app', ['firebase'])
 			'teamMembers': $scope.param.teamMembers,
 			'tags': $scope.param.tags,
 			'weight' : $scope.param.weight,
-			'description': $scope.param.teamDescription
+			'description': (typeof $scope.param.teamDescription !== "undefined" ? $scope.param.teamDescription: "")
 		};
 		$.each($scope.param.teamMembers, function(i, obj) {
 			var rec = $scope.member.$getRecord(obj);
@@ -246,6 +277,9 @@ angular.module('teamform-team-app', ['firebase'])
 					if(data.child("weight").val() != null) {
 						$scope.param.weight = data.child("weight").val();
 					}
+					if(data.child("description").val() != null) {
+						$scope.param.teamDescription = data.child("description").val();
+					}
 					$scope.$apply();
 				});
 			}
@@ -257,17 +291,22 @@ angular.module('teamform-team-app', ['firebase'])
 	//tagsfunctions
 	$scope.searchTags = [];
 	$scope.filterByTag =function(memTag){
+		var tagFound = false;
 		if ($scope.searchTags.length == 0){return true;}
+		if (memTag == null){return false;}
 		var length = (typeof memTag != "undefined")? memTag.length: 0;
 		var slength = (typeof $scope.searchTags != "undefined")? $scope.searchTags.length: 0;
 		for (var i=0;i<slength;i++){
+			tagFound = false;
 			for (var j=0; j<length;j++){
 				if(memTag[j] == $scope.searchTags[i]){
-					return true;
+					tagFound = true;
+					break;
 				}
 			}
+			if(!tagFound){return false;}
 		}
-		return false;
+		return tagFound;
 	}
 	$scope.addSearchTags = function(tagval){
 		var addOrNot = true;
@@ -281,7 +320,6 @@ angular.module('teamform-team-app', ['firebase'])
 		}
 		if(addOrNot){
 			$scope.searchTags.push(tagval);
-			var div = document.getElementById("filterMember");
 		}
 		else{
 			$scope.searchTags.splice(k,1);
@@ -331,8 +369,21 @@ angular.module('teamform-team-app', ['firebase'])
 			$scope.saveFunc();
 		}
 	};
+	
+	$scope.askForConfirm = function(confirmCallback, param) {
+		document.getElementById('confirm').style.display='block';
+		$('#confirm').one('click', '#delete', function (e) {
+				confirmCallback(param);
+				console.log("Confirmed ");
+				document.getElementById('confirm').style.display='none';
+			}).one('click', '#cancel', function(e) {
+				console.log("Cancel");
+				document.getElementById('confirm').style.display='none';
+			});
+	}
 
 	$scope.removeMember = function(member) {
+		/*
 		var x;
 		if ($scope.param.teamMembers.length > 1){
 			x = confirm("Are you sure to remove this team member?");
@@ -355,8 +406,22 @@ angular.module('teamform-team-app', ['firebase'])
 			}
 			$scope.saveFunc();
 		}
+		*/
+		var index = $scope.param.teamMembers.indexOf(member);
+		if(index > -1) {
+			$scope.param.teamMembers.splice(index, 1); // remove that item
+			var refPath = $scope.eventName + "/member/" + member;
+			var ref = firebase.database().ref(refPath);
+			ref.update({inTeam: null});
+			if($scope.param.teamMembers.length == 0){
+				var refPath1 = $scope.eventName + "/team/" + $scope.param.teamName;
+				var ref1 = firebase.database().ref(refPath1);
+				ref1.remove();
+			}
+		}
+		$scope.saveFunc();
 	};	
-
+	/*
 	$scope.checkTeam = function(){
 		//check if teamName exist
 		$scope.teamList = [];
@@ -370,10 +435,31 @@ angular.module('teamform-team-app', ['firebase'])
 			}
 		}
 		return false;
-	};	
+	};
+	*/
+	
+	$scope.canInvite = function(memberId) {
+		if($scope.param.teamName === undefined || $scope.param.teamName == "") return false;
+		
+		// already full
+		if($scope.param.teamMembers.length == $scope.param.currentTeamSize) return false;
+		
+		var memberInfo;
+		for(var idx = 0; idx < $scope.member.length; idx++) {
+			if($scope.member[idx].$id == memberId) {
+				memberInfo = $scope.member[idx];
+				break;
+			}
+		}
+		if(typeof memberInfo === "undefined"
+			|| typeof memberInfo.inTeam !== "undefined"
+			|| (typeof memberInfo.invitedBy !== "undefined" && memberInfo.invitedBy.indexOf($scope.param.teamName) !== -1)) return false;
+		return true;
+	};
 	
 	//invite function
 	$scope.sendInvite = function(id) {
+		/*
 		if (typeof $scope.param.teamName == 'undefined' || $scope.param.teamName == "") {
 			window.alert("Enter a team name first!");
 			return;
@@ -381,7 +467,8 @@ angular.module('teamform-team-app', ['firebase'])
 		if ($scope.checkTeam() != true) {
 			window.alert("Team \"" + $scope.param.teamName + "\" does not exist!");
 			return;
-		}		
+		}	
+		*/	
 		//check if user in a team, if not invite user
 		var data;
 		for(var idx = 0; idx < $scope.member.length; idx++) {
